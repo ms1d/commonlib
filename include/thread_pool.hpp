@@ -40,9 +40,9 @@ class thread_pool {
 		
 		std::optional<std::future<void>> try_emplace_task(arg_Ts... args) {
 			if (stop.load()) return std::nullopt;
-			auto curr = busy_workers.fetch_add(1);
+			auto curr = busy_workers.fetch_add(1, std::memory_order_acq_rel);
 			if (curr >= worker_count) {
-				busy_workers.fetch_sub(1);
+				busy_workers.fetch_sub(1, std::memory_order_acq_rel);
 				return std::nullopt;
 			}
 
