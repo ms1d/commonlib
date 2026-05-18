@@ -97,9 +97,12 @@ class thread_pool {
 				tasks.pop();
 
 				lock.unlock();
-
-				std::apply(func, t.args);
-				t.promise.set_value();
+				try {
+					std::apply(func, t.args);
+					t.promise.set_value();
+				} catch (const std::exception&) {
+					t.promise.set_exception(std::current_exception());
+				} 
 				busy_workers--;
 			}
 		}
