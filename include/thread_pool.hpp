@@ -4,7 +4,6 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <future>
 #include <mutex>
 #include <optional>
@@ -18,7 +17,7 @@
 // Simple, lightweight bounded thread pool.
 // To init, provide number of workers + function to run with arg_Ts input
 // Use try_emplace_task() to add a task. if it returns false, the task could not be added
-template<class... arg_Ts>
+template<auto func, class... arg_Ts>
 class thread_pool {
 	struct task_t {
 		std::tuple<arg_Ts...> args;
@@ -26,7 +25,7 @@ class thread_pool {
 	};
 
 	public:
-		thread_pool(const size_t worker_count, std::function<void(arg_Ts...)> func) : func(func), worker_count(worker_count) {
+		thread_pool(const size_t worker_count) : worker_count(worker_count) {
 
 			if (worker_count == 0)
 				throw std::runtime_error("worker_count must be > 0");
@@ -73,7 +72,6 @@ class thread_pool {
 		std::condition_variable tasks_cv;
 		std::queue<task_t> tasks;
 		std::mutex tasks_mtx;
-		std::function<void(arg_Ts...)> func;
 
 		std::vector<std::thread> workers;
 
