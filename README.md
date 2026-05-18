@@ -1,7 +1,11 @@
-# Common
+# commonlib
 
 A bunch of misc. stuff I use for c++. Watch this space!
 
-## Precision
+## precision.cuh
 
-- Header only lib to standardise precision of my other libraries
+- CUDA-Compatible header-only lib to standardise precision of my other libraries
+
+## thread_pool.hpp
+
+- Basic thread pool with both mandatory and opportunistic emplace methods
