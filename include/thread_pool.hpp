@@ -94,8 +94,10 @@ class thread_pool {
 
 				lock.unlock();
 				std::apply(func, t.args);
-				t.is_ready->store(true);
-				t.is_ready->notify_one();
+				if (t.is_ready != nullptr) {	
+					t.is_ready->store(true);
+					t.is_ready->notify_one();
+				}
 				busy_workers--;
 			}
 		}
