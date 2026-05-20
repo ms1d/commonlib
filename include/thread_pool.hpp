@@ -4,9 +4,7 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <future>
 #include <mutex>
-#include <optional>
 #include <queue>
 #include <stdexcept>
 #include <thread>
@@ -21,7 +19,7 @@ template<auto func, class... arg_Ts>
 class thread_pool {
 	struct task_t {
 		std::tuple<arg_Ts...> args;
-		std::promise<void> promise;
+		std::atomic<bool> *is_ready;
 	};
 
 	public:
@@ -37,27 +35,25 @@ class thread_pool {
 			}
 		}
 		
-		std::optional<std::future<void>> try_emplace_task(arg_Ts... args) {
-			if (stop.load()) return std::nullopt;
-			auto curr = busy_workers.fetch_add(1, std::memory_order_acq_rel);
+		bool try_emplace_task(std::atomic<bool> *is_ready = nullptr, arg_Ts... args) {
+			if (stop.load()) return false;
+			auto curr = busy_workers.fetch_add(1, std::memory_order_relaxed);
 			if (curr >= worker_count) {
-				busy_workers.fetch_sub(1, std::memory_order_acq_rel);
-				return std::nullopt;
+				busy_workers.fetch_sub(1, std::memory_order_relaxed);
+				return false;
 			}
 
 			task_t task{
 				std::tuple<arg_Ts...>(args...),
-				std::promise<void>()
+				is_ready
 			};
-			auto fut = task.promise.get_future();
-
 			{
 				std::lock_guard<std::mutex> lock(tasks_mtx);
 				tasks.push(std::move(task));
 			}
 
 			tasks_cv.notify_one();
-			return fut;
+			return true;
 		}
 
 		~thread_pool() {
@@ -97,12 +93,9 @@ class thread_pool {
 				tasks.pop();
 
 				lock.unlock();
-				try {
-					std::apply(func, t.args);
-					t.promise.set_value();
-				} catch (const std::exception&) {
-					t.promise.set_exception(std::current_exception());
-				} 
+				std::apply(func, t.args);
+				t.is_ready->store(true);
+				t.is_ready->notify_one();
 				busy_workers--;
 			}
 		}
