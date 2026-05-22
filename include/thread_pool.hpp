@@ -36,24 +36,21 @@ class thread_pool {
 		}
 		
 		bool try_emplace_task(std::atomic<bool> *is_ready = nullptr, arg_Ts... args) {
-			if (stop.load()) return false;
+			if (stop.load(std::memory_order_relaxed)) return false;
 			auto curr = busy_workers.fetch_add(1, std::memory_order_relaxed);
 			if (curr >= worker_count) {
 				busy_workers.fetch_sub(1, std::memory_order_relaxed);
 				return false;
 			}
+		
+			emplace_task_internal(is_ready, args...);
 
-			task_t task{
-				std::tuple<arg_Ts...>(args...),
-				is_ready
-			};
-			{
-				std::lock_guard<std::mutex> lock(tasks_mtx);
-				tasks.push(std::move(task));
-			}
-
-			tasks_cv.notify_one();
 			return true;
+		}
+
+		void emplace_task(std::atomic<bool> *is_ready = nullptr, arg_Ts... args) {
+			if (stop.load(std::memory_order_relaxed)) return;
+			emplace_task_internal(is_ready, args...);
 		}
 
 		~thread_pool() {
@@ -77,6 +74,20 @@ class thread_pool {
 
 		// Flag for all threads to READ to determine whether or not they should take on more tasks
 		std::atomic<bool> stop = false;
+
+		void emplace_task_internal(std::atomic<bool> *is_ready, arg_Ts... args) {
+			task_t task{
+				std::tuple<arg_Ts...>(args...),
+				is_ready
+			};
+
+			{
+				std::lock_guard<std::mutex> lock(tasks_mtx);
+				tasks.push(std::move(task));
+			}
+
+			tasks_cv.notify_one();
+		}
 		
 		void worker_loop() {
 			while (1) {
@@ -105,3 +116,4 @@ class thread_pool {
 
 
 };
+
