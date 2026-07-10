@@ -8,7 +8,30 @@
 #include <queue>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 #include <vector>
+
+
+
+template<typename R, typename... arg_Ts>
+struct task_t {
+	std::tuple<arg_Ts...> args;
+	std::atomic<bool> *is_ready;
+	R result;
+
+	void set_result(R res) { result = res; }
+};
+
+
+template<typename... arg_Ts>
+struct task_t<void, arg_Ts...> {
+	std::tuple<arg_Ts...> args;
+	std::atomic<bool> *is_ready;
+
+	void set_result(void) { }
+};
+
+
 
 template<auto func>
 class thread_pool;
@@ -18,11 +41,6 @@ class thread_pool;
 // Use try_emplace_task() to add a task. if it returns false, the task could not be added
 template<typename R, typename... arg_Ts, R(*func)(arg_Ts...)>
 class thread_pool<func> {
-	struct task_t {
-		std::tuple<arg_Ts...> args;
-		std::atomic<bool> *is_ready;
-	};
-
 	public:
 		thread_pool(const size_t worker_count) : worker_count(worker_count) {
 
@@ -64,7 +82,7 @@ class thread_pool<func> {
 
 	private:
 		std::condition_variable tasks_cv;
-		std::queue<task_t> tasks;
+		std::queue<task_t<R>> tasks;
 		std::mutex tasks_mtx;
 
 		std::vector<std::thread> workers;
@@ -105,9 +123,11 @@ class thread_pool<func> {
 				tasks.pop();
 
 				lock.unlock();
-				std::apply(func, t.args);
+
+				t.set_result(std::apply(func, t.args));
+
 				if (t.is_ready != nullptr) {	
-					t.is_ready->store(true);
+					t.is_ready->store(true);					
 					t.is_ready->notify_one();
 				}
 				busy_workers--;
