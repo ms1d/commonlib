@@ -82,7 +82,7 @@ class thread_pool<func> {
 
 	private:
 		std::condition_variable tasks_cv;
-		std::queue<task_t<R>> tasks;
+		std::queue<task_t<R, arg_Ts...>> tasks;
 		std::mutex tasks_mtx;
 
 		std::vector<std::thread> workers;
@@ -95,7 +95,7 @@ class thread_pool<func> {
 		std::atomic<bool> stop = false;
 
 		void emplace_task_internal(std::atomic<bool> *is_ready, arg_Ts... args) {
-			task_t<R> task {
+			task_t<R, arg_Ts...> task {
 				std::tuple<arg_Ts...>(args...),
 				is_ready
 			};
