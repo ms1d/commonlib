@@ -10,13 +10,14 @@
 #include <thread>
 #include <vector>
 
-
+template<auto func>
+class thread_pool;
 
 // Simple, lightweight bounded thread pool.
 // To init, provide number of workers + function to run with arg_Ts input
 // Use try_emplace_task() to add a task. if it returns false, the task could not be added
-template<auto func, class... arg_Ts>
-class thread_pool {
+template<typename R, typename... arg_Ts, R(*func)(arg_Ts...)>
+class thread_pool<func> {
 	struct task_t {
 		std::tuple<arg_Ts...> args;
 		std::atomic<bool> *is_ready;
@@ -116,4 +117,3 @@ class thread_pool {
 
 
 };
-
