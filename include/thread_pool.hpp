@@ -95,7 +95,7 @@ class thread_pool<func> {
 		std::atomic<bool> stop = false;
 
 		void emplace_task_internal(std::atomic<bool> *is_ready, arg_Ts... args) {
-			task_t task{
+			task_t<R> task {
 				std::tuple<arg_Ts...>(args...),
 				is_ready
 			};
