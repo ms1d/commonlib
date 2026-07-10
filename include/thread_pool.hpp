@@ -19,7 +19,14 @@ struct task_t {
 	std::atomic<bool> *is_ready;
 	R result;
 
-	void set_result(R res) { result = res; }
+	void execute(R(*func)(arg_Ts...)){
+		result = std::apply(func, args);
+
+		if (is_ready != nullptr) {	
+			is_ready->store(true);					
+			is_ready->notify_one();
+		}
+	}
 };
 
 
@@ -28,7 +35,14 @@ struct task_t<void, arg_Ts...> {
 	std::tuple<arg_Ts...> args;
 	std::atomic<bool> *is_ready;
 
-	void set_result(void) { }
+	void execute(void(*func)(arg_Ts...)){	
+		std::apply(func, args);
+
+		if (is_ready != nullptr) {
+			is_ready->store(true);
+			is_ready->notify_one();
+		}
+	}
 };
 
 
@@ -124,12 +138,8 @@ class thread_pool<func> {
 
 				lock.unlock();
 
-				t.set_result(std::apply(func, t.args));
+				t.execute(func);
 
-				if (t.is_ready != nullptr) {	
-					t.is_ready->store(true);					
-					t.is_ready->notify_one();
-				}
 				busy_workers--;
 			}
 		}
